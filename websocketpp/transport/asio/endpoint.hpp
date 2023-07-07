@@ -932,11 +932,24 @@ protected:
             )
         );
 
+        lib::asio::ip::resolver_base::flags resolve_flags = lib::asio::ip::resolver_base::flags();
+        if (!port.empty()) {
+            // port is always numeric
+            resolve_flags = resolve_flags | lib::asio::ip::resolver_base::flags::numeric_service;
+        }
+        // check if the host is a numeric address to specify proper resolve flags
+        lib::asio::error_code ec;
+        static_cast<void>(lib::asio::ip::make_address(host, ec));
+        if (!ec) {
+            resolve_flags = resolve_flags | lib::asio::ip::resolver_base::flags::numeric_host;
+        }
+
         if (config::enable_multithreading) {
-            lib::asio::dispatch(tcon->get_strand()->wrap([this, host, port, tcon, dns_timer, cb]{
+            lib::asio::dispatch(tcon->get_strand()->wrap([this, host, port, resolve_flags, tcon, dns_timer, cb]{
                 m_resolver->async_resolve(
                     host,
                     port,
+                    resolve_flags,
                     tcon->get_strand()->wrap(lib::bind(
                         &type::handle_resolve,
                         this,
